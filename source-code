@@ -1,0 +1,179 @@
+import java.security.KeyPairGenerator;
+import java.security.MessageDigest;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import static java.util.Objects.hash;
+import java.util.Scanner;
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+
+/**
+ *
+ * @author Lekha
+ */
+public class Assignment {
+  
+    
+         static KeyPair generateRSA() throws Exception {
+		KeyPairGenerator generate = KeyPairGenerator.getInstance("RSA");
+		generate.initialize(2048);
+		KeyPair kp = generate.generateKeyPair();
+		return kp;
+         }
+         
+         static byte[] keyEncrypt(SecretKey sharedKey, PublicKey publicKey){
+			byte[] encryptedKey = null;
+			try {
+			Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+			cipher.init(Cipher.ENCRYPT_MODE, publicKey);
+		    encryptedKey = cipher.doFinal(sharedKey.getEncoded());
+			return encryptedKey;
+
+			}
+			catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			return encryptedKey;
+	}
+         
+         static byte[] keyDecrypt(byte[] encryptedSharedKey, PrivateKey privateKey){
+		byte[] decryptedKey = null;
+	    try {
+	      // get an RSA cipher object and print the provider
+	      Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+
+	      // decrypt the text using the private key
+	      cipher.init(Cipher.DECRYPT_MODE, privateKey);
+	      decryptedKey = cipher.doFinal(encryptedSharedKey);
+
+	    } catch (Exception ex) {
+	      ex.printStackTrace();
+	    }
+	    return decryptedKey;
+	}
+         
+         static byte[] dataEncrypt(byte[] decryptedSharedKey, String Filedata){
+		byte[] EncryptFile = null;
+		try{
+		FileWriter write = new FileWriter("Output.txt",true);
+                BufferedWriter bf = new BufferedWriter(write);
+	    MessageDigest md = MessageDigest.getInstance("SHA-256");
+	    md.update(Filedata.getBytes());
+	    byte[] hashBytes = md.digest();
+             StringBuffer hash ;
+             hash = new StringBuffer();
+		for (int i = 0; i < hashBytes.length; i++) {
+			hash.append(Integer.toString((hashBytes[i] & 0xff) + 0x100, 16).substring(1));
+		}
+		bf.write("\n Hash Digest"+String.valueOf(hash));
+		String hashedData = Filedata+"%&*"+String.valueOf(hash);
+		Cipher cipher = Cipher.getInstance("AES");
+		cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(decryptedSharedKey, "AES"));
+                //cipher.init(Cipher.ENCRYPT_MODE,decryptedSharedKey);
+	    EncryptFile = cipher.doFinal(hashedData.getBytes());
+		bf.close();
+		return EncryptFile;
+		}catch(Exception e){
+			e.printStackTrace();
+		}
+		return EncryptFile;
+	}
+         
+         static boolean dataDecrypt(byte[] encryptFile, byte[] decryptedSharedKey ){
+		boolean status=true;   
+		try{
+		FileWriter write = new FileWriter("Decrypt.txt",true);
+	    BufferedWriter bf = new BufferedWriter(write);
+		byte[] decryptFile = null;
+		Cipher cipher = Cipher.getInstance("AES");
+		cipher.init(Cipher.DECRYPT_MODE,new SecretKeySpec(decryptedSharedKey, "AES"));
+	    decryptFile = cipher.doFinal(encryptFile);
+	    
+	    String decryptedString = new String(decryptFile);
+	    String subString = decryptedString.substring((decryptedString.indexOf("%&*")+3));
+	    bf.write("Hash Digest Decrypted---- "+subString);
+        
+	    decryptedString = decryptedString.substring(0,(decryptedString.indexOf("%&*")));
+	    MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+	    messageDigest.update(decryptedString.getBytes());
+	    byte[] hashed = messageDigest.digest();
+		StringBuffer hash ;
+		hash = new StringBuffer();
+		for (int i = 0; i < hashed.length; i++) {
+			hash.append(Integer.toString((hashed[i] & 0xff) + 0x100, 16).substring(1));
+		}
+		System.out.println("\n"+String.valueOf(hash));
+		
+		if(subString.equals(String.valueOf(hash)))
+			status = true;
+		else
+			status = false;
+
+        bf.close();
+        return status;
+
+	    }catch(Exception e){
+			e.printStackTrace();
+	    }
+		return status;
+	}
+
+    /**
+     * @param args the command line arguments
+     */
+    public static void main(String[] args) throws Exception {
+                int keyLength = 0;
+                byte[] encryptedSharedKey;
+                byte[] decryptedSharedKey;
+                byte[] encryptFile;
+                boolean check=true;
+                Scanner s=new Scanner(System.in);
+        
+                KeyPair kp = generateRSA();
+		PrivateKey privateKey = kp.getPrivate();
+		PublicKey publicKey = kp.getPublic();
+                
+                while(check)
+                {
+                System.out.println("enter the symmetric key length");
+                keyLength=s.nextInt();
+                if((keyLength==128) ||(keyLength==192) || (keyLength==256))
+                {
+                    check=false;
+                }
+                else
+                {
+                    System.out.println("invalid keylength");
+                }
+                }
+		KeyGenerator generate = KeyGenerator.getInstance("AES"); 
+		generate.init(keyLength); 
+		SecretKey sharedKey = generate.generateKey();
+		System.out.println("\n Shared Key is "+ new String(sharedKey.getEncoded()));
+                
+                encryptedSharedKey=keyEncrypt(sharedKey,publicKey);
+                System.out.println("encrypted shared key is ");
+                System.out.println(new String(encryptedSharedKey));
+                
+                decryptedSharedKey=keyDecrypt(encryptedSharedKey,privateKey);
+                System.out.println("the decrypted shared key is ");
+                System.out.println(new String(decryptedSharedKey));
+                
+                String fileData = new String(Files.readAllBytes(Paths.get("C:\\Users\\Lekha Karanam\\test.txt")));
+                encryptFile = dataEncrypt(decryptedSharedKey, fileData);
+                
+                
+		
+                
+               boolean status = dataDecrypt(encryptFile, decryptedSharedKey );
+		if (status)
+			System.out.println("accepted");
+		else
+			System.out.println("rejected");
+        // TODO code application logic here
+    }
+    
+}
